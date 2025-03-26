@@ -1,4 +1,3 @@
-import connectToDB from "../utils/connection.js";
 import createError from "../utils/error.js";
 import bcrypt from "bcrypt";
 import User from "../models/userModel.js";
@@ -11,8 +10,6 @@ export const signUp = async (req, res, next) => {
     if (!email || !password || !name) {
       return next(createError(400, "Missing required fields"));
     }
-
-    await connectToDB();
 
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(password, salt);
@@ -36,8 +33,6 @@ export const login = async (req, res, next) => {
       return next(createError(400, "Missing required fields"));
     }
 
-    await connectToDB();
-
     const user = await User.findOne({ email }).select("+password");
     if (!user) return next(createError(400, "Invalid credentials"));
 
@@ -45,9 +40,13 @@ export const login = async (req, res, next) => {
     if (!isPasswordCorrect)
       return next(createError(400, "Invalid credentials"));
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
 
     res.status(200).json({
       message: "User Logged In",
@@ -67,7 +66,7 @@ export const login = async (req, res, next) => {
 
 export const getUserInfo = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).select("+password");
 
     if (!user) return next(createError(404, "User not found"));
 
@@ -77,6 +76,8 @@ export const getUserInfo = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        password: user.password,
+        availability: user.availability,
       },
     });
   } catch (error) {
@@ -87,7 +88,22 @@ export const getUserInfo = async (req, res, next) => {
 export const updateUser = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
+    const { name, email, password } = req.body;
+
+    const updateFields = {};
+
+    if (name) updateFields.name = name;
+    if (email) updateFields.email = email;
+    if (password) {
+      const salt = bcrypt.genSaltSync(10);
+      updateFields.password = bcrypt.hashSync(password, salt);
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      return next(createError(400, "No valid fields provided for update"));
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, updateFields, {
       new: true,
     });
 
@@ -100,8 +116,6 @@ export const updateUser = async (req, res, next) => {
         name: updatedUser.name,
         email: updatedUser.email,
         availability: updatedUser.availability,
-        eventsCreated: updatedUser.eventsCreated,
-        eventsJoined: updatedUser.eventsJoined,
       },
     });
   } catch (error) {
