@@ -12,8 +12,9 @@ export const createEvent = async (req, res, next) => {
 
         return {
           email: participant.email,
-          userId: user._id,
-          status: participant.status.toUpperCase(),
+          name: user?.name || participant.email.split("@")[0],
+          userId: user?._id || null,
+          status: participant.status?.toUpperCase() || "PENDING",
         };
       })
     );
@@ -26,9 +27,10 @@ export const createEvent = async (req, res, next) => {
 
     await newEvent.save();
 
-    res
-      .status(201)
-      .json({ message: "Event created successfully", event: newEvent });
+    res.status(201).json({
+      message: "Event created successfully",
+      event: newEvent,
+    });
   } catch (error) {
     next(createError(400, error.message || "Failed to create event"));
   }
@@ -37,7 +39,6 @@ export const createEvent = async (req, res, next) => {
 export const getEvents = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    console.log("Fetching events for user:", userId);
 
     const events = await Event.find({
       $or: [

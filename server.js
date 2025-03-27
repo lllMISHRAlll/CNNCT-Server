@@ -5,6 +5,7 @@ import connectToDB from "./utils/connection.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import eventRoutes from "./routes/event.js";
+import availabilityRoutes from "./routes/availability.js";
 import { verifyToken } from "./middlware/verify.js";
 
 dotenv.config();
@@ -21,6 +22,7 @@ app.use("/api/auth", authRoutes);
 app.use(verifyToken);
 app.use("/api/user", userRoutes);
 app.use("/api/event", eventRoutes);
+app.use("/api/availability", availabilityRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).send({

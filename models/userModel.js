@@ -21,17 +21,31 @@ const UserSchema = new mongoose.Schema(
       minlength: [6, "Minimum length is 6"],
       select: false,
     },
+    userName: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+    preference: {
+      type: String,
+    },
     availability: {
-      type: [{ day: Number, startTime: String, endTime: String }],
-      default: [
-        { day: 0, startTime: "00:00", endTime: "00:00" },
-        { day: 1, startTime: "00:00", endTime: "23:59" },
-        { day: 2, startTime: "00:00", endTime: "23:59" },
-        { day: 3, startTime: "00:00", endTime: "23:59" },
-        { day: 4, startTime: "00:00", endTime: "23:59" },
-        { day: 5, startTime: "00:00", endTime: "23:59" },
-        { day: 6, startTime: "00:00", endTime: "23:59" },
+      type: Map,
+      of: [
+        {
+          from: String,
+          to: String,
+        },
       ],
+      default: {
+        Mon: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Tue: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Wed: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Thu: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Fri: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Sat: [{ from: "12:00 AM", to: "11:59 PM" }],
+        Sun: [{ from: "00:00 AM", to: "00:00 PM" }],
+      },
     },
   },
   { timestamps: true }
