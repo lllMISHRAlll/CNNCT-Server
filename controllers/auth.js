@@ -5,26 +5,57 @@ import jwt from "jsonwebtoken";
 
 export const signUp = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    console.log("Received signup data:", req.body);
 
-    if (!email || !password || !name) {
-      return next(createError(400, "Missing required fields"));
+    const { name, email, password, username, preference } = req.body;
+
+    if (!name || !email || !password || !username) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
     }
 
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(password, salt);
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
 
-    const newUser = new User({ name, email, password: hash });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Email or username already exists",
+      });
+    }
+
+    const newUser = new User({
+      name,
+      email: email.toLowerCase(),
+      password: bcrypt.hashSync(password, 10),
+      username,
+      preference,
+    });
 
     await newUser.save();
 
-    res.status(201).json("User created successfully");
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        username: newUser.username,
+      },
+    });
   } catch (error) {
-    console.error("Registration Error:", error);
-    return next(createError(400, error.message || "Internal Server Error"));
+    console.error("Signup error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 };
-
 export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
