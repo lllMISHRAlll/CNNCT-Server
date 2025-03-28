@@ -1,110 +1,190 @@
 import Event from "../models/eventModel.js";
-import User from "../models/userModel.js";
 import createError from "../utils/error.js";
 import moment from "moment-timezone";
+import User from "../models/userModel.js";
 
-// Fetch user availability
-const getUserAvailability = async (userId) => {
-  const user = await User.findById(userId);
-  if (!user) throw new Error("User not found");
-  return user.availability;
+const getEventTimeInUTC = (date, time, period, timezone, duration, id) => {
+  const formattedTime = `${date} ${time} ${period}`;
+  const eventStart = moment
+    .tz(formattedTime, "DD/MM/YY hh:mm A", timezone)
+    .utc();
+  const eventEnd = eventStart.clone().add(duration, "hours");
+  return { start: eventStart.valueOf(), end: eventEnd.valueOf(), id };
 };
 
-// Convert event time to moment object
-const getEventTime = (event) => {
-  const eventStart = moment.tz(
-    `${event.date} ${event.time} ${event.period}`,
-    "YYYY-MM-DD hh:mm A",
-    event.timezone
+function hasOverlap(events) {
+  const conflict = new Map();
+  const utcEvents = events.map((event) =>
+    getEventTimeInUTC(
+      event.date,
+      event.time,
+      event.period,
+      event.timezone,
+      event.duration,
+      event.id
+    )
   );
-  const eventEnd = eventStart.clone().add(event.duration, "minutes");
-  return { eventStart, eventEnd };
-};
 
-// Check if event is within availability
-const isWithinAvailability = (eventStart, eventEnd, availability) => {
-  const day = eventStart.day(); // Ensure day matches availability keys (0-6)
-  const slots = availability[day] || [];
+  for (let i = 0; i < utcEvents.length; i++) {
+    for (let j = i + 1; j < utcEvents.length; j++) {
+      const eventA = utcEvents[i];
+      const eventB = utcEvents[j];
 
-  return slots.some((slot) => {
-    const slotStart = moment.tz(
-      eventStart.format("YYYY-MM-DD") + " " + slot.startTime,
-      "YYYY-MM-DD HH:mm",
-      eventStart.tz()
-    );
-    const slotEnd = moment.tz(
-      eventStart.format("YYYY-MM-DD") + " " + slot.endTime,
-      "YYYY-MM-DD HH:mm",
-      eventStart.tz()
-    );
-
-    return (
-      eventStart.isBetween(slotStart, slotEnd, null, "[)") &&
-      eventEnd.isBetween(slotStart, slotEnd, null, "[)")
-    );
-  });
-};
-
-// Check if event overlaps with other events
-const checkOverlappingEvents = (event, allEvents) => {
-  const { eventStart, eventEnd } = getEventTime(event);
-
-  for (const otherEvent of allEvents) {
-    if (otherEvent._id.equals(event._id)) continue;
-
-    const { eventStart: otherStart, eventEnd: otherEnd } =
-      getEventTime(otherEvent);
-
-    if (
-      (eventStart.isBefore(otherEnd) && eventEnd.isAfter(otherStart)) ||
-      (otherStart.isBefore(eventEnd) && otherEnd.isAfter(eventStart))
-    ) {
-      return true; // Conflict detected
+      if (eventA.start < eventB.end && eventA.end > eventB.start) {
+        if (!conflict.has(eventA.id)) {
+          conflict.set(eventA.id, { conflict: true });
+        }
+      }
     }
   }
 
-  return false;
-};
+  return Array.from(conflict, ([e1, value]) => ({ e1, ...value }));
+}
 
-// Main function to get events with conflict detection
+function isWithinAvailability(event, availability) {
+  const utcEvent = getEventTimeInUTC(
+    event.date,
+    event.time,
+    event.period,
+    event.timezone,
+    event.duration,
+    event.id
+  );
+
+  const eventDay = moment.utc(utcEvent.start).day().toString();
+  const availableSlots = availability.get(eventDay);
+
+  if (!availableSlots) return { [event.id]: false };
+
+  const isAvailable = availableSlots.some((slot) => {
+    const eventDate = moment(utcEvent.start)
+      .tz(event.timezone)
+      .format("YYYY-MM-DD");
+
+    const eventStart12 = moment(utcEvent.start)
+      .tz(event.timezone)
+      .format("YYYY-MM-DD hh:mm A");
+    const eventEnd12 = moment(utcEvent.end)
+      .tz(event.timezone)
+      .format("YYYY-MM-DD hh:mm A");
+
+    const slotStart12 = moment
+      .tz(
+        `${eventDate} ${slot.startTime}`,
+        "YYYY-MM-DD hh:mm A",
+        event.timezone
+      )
+      .format("YYYY-MM-DD hh:mm A");
+    const slotEnd12 = moment
+      .tz(`${eventDate} ${slot.endTime}`, "YYYY-MM-DD hh:mm A", event.timezone)
+      .format("YYYY-MM-DD hh:mm A");
+
+    console.log("Event Day:", eventDay);
+    console.log("Event Start (Event Timezone):", eventStart12);
+    console.log("Event End (Event Timezone):", eventEnd12);
+    console.log("Slot Start (Event Timezone):", slotStart12);
+    console.log("Slot End (Event Timezone):", slotEnd12);
+
+    return (
+      moment(eventStart12, "YYYY-MM-DD hh:mm A").isSameOrAfter(
+        moment(slotStart12, "YYYY-MM-DD hh:mm A")
+      ) &&
+      moment(eventEnd12, "YYYY-MM-DD hh:mm A").isSameOrBefore(
+        moment(slotEnd12, "YYYY-MM-DD hh:mm A")
+      )
+    );
+  });
+
+  return { [event.id]: isAvailable };
+}
+
+function convertAvailability(inputMap) {
+  const dayMap = {
+    Sun: "0",
+    Mon: "1",
+    Tue: "2",
+    Wed: "3",
+    Thu: "4",
+    Fri: "5",
+    Sat: "6",
+  };
+
+  function convertTo24(timeStr) {
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":");
+    hours = parseInt(hours, 10);
+    if (modifier === "PM" && hours !== 12) {
+      hours += 12;
+    }
+    if (modifier === "AM" && hours === 12) {
+      hours = 0;
+    }
+    return `${hours.toString().padStart(2, "0")}:${minutes}`;
+  }
+
+  const outputMap = new Map();
+
+  for (const [dayAbbr, intervals] of inputMap.entries()) {
+    const dayNumber = dayMap[dayAbbr];
+    if (dayNumber !== undefined) {
+      const convertedIntervals = intervals.map((interval) => ({
+        startTime: convertTo24(interval.startTime),
+        endTime: convertTo24(interval.endTime),
+      }));
+      outputMap.set(dayNumber, convertedIntervals);
+    }
+  }
+
+  return outputMap;
+}
+
+function convertEvents(inputEvents) {
+  return inputEvents.map((event) => ({
+    date: event.date,
+    time: event.time,
+    period: event.period,
+    timezone: event.timezone,
+    duration: event.duration,
+    id: event.id,
+  }));
+}
+
 export const getEventsWithConflicts = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    const user = await User.findById(userId);
+    if (!user) throw new Error("User not found");
 
-    // Fetch user availability
-    const availability = await getUserAvailability(userId);
+    const availability = new Map(
+      [...user.availability]
+        .filter(([day]) => day !== "Sun")
+        .map(([day, slots]) => [
+          day,
+          slots.map(({ from, to }) => ({
+            startTime: from,
+            endTime: to,
+          })),
+        ])
+    );
 
-    // Fetch events where user is either creator or participant
     const events = await Event.find({
       $or: [
         { createdBy: userId },
-        { participants: { $elemMatch: { userId: userId } } },
+        { participants: { $elemMatch: { userId } } },
       ],
     });
-
-    // Process events with conflict detection
-    const formattedEvents = events.map((event) => {
-      const { eventStart, eventEnd } = getEventTime(event);
-      let isConflict = false;
-      let reason = "";
-
-      if (
-        !isWithinAvailability(eventStart, eventEnd, availability, event.date)
-      ) {
-        isConflict = true;
-        reason = "Unavilability";
-        // Conflict due to availability
-      }
-
-      if (checkOverlappingEvents(event, events)) {
-        isConflict = true; // Conflict due to overlapping meeting
-        reason = "Overlaping Events";
-      }
-
-      return { ...event.toObject(), isConflict, reason };
+    const formattedEvents = convertEvents(events);
+    const formattedAvialability = convertAvailability(availability);
+    const conflict = hasOverlap(formattedEvents);
+    const availabilityConflict = [];
+    formattedEvents.map((event) => {
+      const response = isWithinAvailability(event, formattedAvialability);
+      availabilityConflict.push(response);
     });
-
-    res.status(200).json({ events: formattedEvents, userId, availability });
+    res.status(200).json({
+      eventConflict: conflict,
+      availableForThisMeeting: availabilityConflict,
+    });
   } catch (error) {
     next(
       createError(400, error.message || "Failed to fetch associated events")
