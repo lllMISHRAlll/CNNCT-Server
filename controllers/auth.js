@@ -58,13 +58,15 @@ export const signUp = async (req, res, next) => {
 };
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!email || !password) {
+    if ((!email && !username) || !password) {
       return next(createError(400, "Missing required fields"));
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({
+      $or: [{ email }, { username }],
+    }).select("+password");
     if (!user) return next(createError(400, "Invalid credentials"));
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
