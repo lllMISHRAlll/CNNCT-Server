@@ -18,17 +18,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
-app.use(verifyToken);
-app.use("/api/user", userRoutes);
-app.use("/api/event", eventRoutes);
-app.use("/api/availability", availabilityRoutes);
-
 app.get("/", (req, res) => {
   res.status(200).send({
     message: "Backend server is up and running!!!",
   });
 });
+
+app.use("/api/auth", authRoutes);
+app.use(verifyToken);
+app.use("/api/user", userRoutes);
+app.use("/api/event", eventRoutes);
+app.use("/api/availability", availabilityRoutes);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
