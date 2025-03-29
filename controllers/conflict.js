@@ -153,7 +153,7 @@ export const getEventsWithConflicts = async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const user = await User.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const availability = new Map(
       [...user.availability]
@@ -187,7 +187,7 @@ export const getEventsWithConflicts = async (req, res, next) => {
     });
   } catch (error) {
     next(
-      createError(400, error.message || "Failed to fetch associated events")
+      createError(500, error.message || "Failed to fetch associated events")
     );
   }
 };

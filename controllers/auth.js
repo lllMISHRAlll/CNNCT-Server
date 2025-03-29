@@ -21,7 +21,7 @@ export const signUp = async (req, res, next) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
         message: "Email or username already exists",
       });
@@ -67,11 +67,11 @@ export const login = async (req, res, next) => {
     const user = await User.findOne({
       $or: [{ email }, { username }],
     }).select("+password");
-    if (!user) return next(createError(400, "Invalid credentials"));
+    if (!user) return next(createError(401, "Invalid credentials"));
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect)
-      return next(createError(400, "Invalid credentials"));
+      return next(createError(401, "Invalid credentials"));
 
     const token = jwt.sign(
       { userId: user._id, email: user.email },
@@ -94,7 +94,7 @@ export const login = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(createError(400, error.message || "Login failed"));
+    next(createError(500, error.message || "Login failed"));
   }
 };
 
@@ -115,7 +115,7 @@ export const getUserInfo = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(createError(400, error.message || "Error fetching user info"));
+    next(createError(500, error.message || "Error fetching user info"));
   }
 };
 
@@ -153,6 +153,6 @@ export const updateUser = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(createError(400, `Updating user failed: ${error.message}`));
+    next(createError(500, `Updating user failed: ${error.message}`));
   }
 };

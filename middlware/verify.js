@@ -15,6 +15,6 @@ export const verifyToken = (req, res, next) => {
       return next(createError(403, "Invalid or Expired Token"));
     next();
   } catch (error) {
-    return next(createError(403, "Invalid or Expired Token"));
+    return next(createError(500, "Invalid or Expired Token"));
   }
 };

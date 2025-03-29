@@ -32,7 +32,7 @@ export const createEvent = async (req, res, next) => {
       event: newEvent,
     });
   } catch (error) {
-    next(createError(400, error.message || "Failed to create event"));
+    next(createError(500, error.message || "Failed to create event"));
   }
 };
 
@@ -49,7 +49,7 @@ export const getEvents = async (req, res, next) => {
 
     res.status(200).json({ events, userId });
   } catch (error) {
-    next(createError(400, "Failed to fetch associated events"));
+    next(createError(500, "Failed to fetch associated events"));
   }
 };
 
@@ -65,7 +65,7 @@ export const updateEvent = async (req, res, next) => {
       .status(200)
       .json({ message: "Event updated successfully", event: updatedEvent });
   } catch (error) {
-    next(createError(400, error.message || "Failed to update event"));
+    next(createError(500, error.message || "Failed to update event"));
   }
 };
 
@@ -77,7 +77,7 @@ export const deleteEvent = async (req, res, next) => {
 
     res.status(200).json({ message: "Event deleted successfully" });
   } catch (error) {
-    next(createError(400, error.message || "Failed to delete event"));
+    next(createError(500, error.message || "Failed to delete event"));
   }
 };
 
@@ -96,8 +96,8 @@ export const changeStatus = async (req, res, next) => {
       return next(createError(404, "Event not found"));
     }
 
-    const participant = event.participants.find(
-      (p) => p.userId.toString() === userId
+    const participant = event?.participants.find(
+      (p) => p.userId && p.userId.toString() === userId
     );
     if (!participant) {
       return next(createError(404, "Participant not found"));
