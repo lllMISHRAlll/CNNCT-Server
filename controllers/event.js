@@ -9,6 +9,7 @@ export const createEvent = async (req, res, next) => {
     participants = await Promise.all(
       participants.map(async (participant) => {
         const user = await User.findOne({ email: participant.email });
+        console.log("user :", user);
 
         return {
           email: participant.email,

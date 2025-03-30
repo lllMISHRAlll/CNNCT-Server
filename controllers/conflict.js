@@ -79,12 +79,6 @@ function isWithinAvailability(event, availability) {
       .tz(`${eventDate} ${slot.endTime}`, "YYYY-MM-DD hh:mm A", event.timezone)
       .format("YYYY-MM-DD hh:mm A");
 
-    console.log("Event Day:", eventDay);
-    console.log("Event Start (Event Timezone):", eventStart12);
-    console.log("Event End (Event Timezone):", eventEnd12);
-    console.log("Slot Start (Event Timezone):", slotStart12);
-    console.log("Slot End (Event Timezone):", slotEnd12);
-
     return (
       moment(eventStart12, "YYYY-MM-DD hh:mm A").isSameOrAfter(
         moment(slotStart12, "YYYY-MM-DD hh:mm A")
