@@ -6,7 +6,7 @@ import User from "../models/userModel.js";
 const getEventTimeInUTC = (date, time, period, timezone, duration, id) => {
   const formattedTime = `${date} ${time} ${period}`;
   const eventStart = moment
-    .tz(formattedTime, "DD/MM/YY hh:mm A", timezone)
+    .tz(formattedTime, "DD/MM/YYYY hh:mm A", timezone)
     .utc();
   const eventEnd = eventStart.clone().add(duration, "hours");
   return { start: eventStart.valueOf(), end: eventEnd.valueOf(), id };
@@ -51,7 +51,7 @@ function isWithinAvailability(event, availability) {
     event.id
   );
 
-  const eventDay = moment.utc(utcEvent.start).day().toString();
+  const eventDay = moment(utcEvent.start).tz(event.timezone).day().toString();
   const availableSlots = availability.get(eventDay);
 
   if (!availableSlots) return { [event.id]: false };
@@ -94,13 +94,13 @@ function isWithinAvailability(event, availability) {
 
 function convertAvailability(inputMap) {
   const dayMap = {
-    Sun: "0",
     Mon: "1",
     Tue: "2",
     Wed: "3",
     Thu: "4",
     Fri: "5",
     Sat: "6",
+    Sun: "0",
   };
 
   function convertTo24(timeStr) {

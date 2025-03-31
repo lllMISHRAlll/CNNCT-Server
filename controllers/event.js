@@ -9,7 +9,6 @@ export const createEvent = async (req, res, next) => {
     participants = await Promise.all(
       participants.map(async (participant) => {
         const user = await User.findOne({ email: participant.email });
-        console.log("user :", user);
 
         return {
           email: participant.email,
@@ -37,6 +36,44 @@ export const createEvent = async (req, res, next) => {
   }
 };
 
+export const updateEvent = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    let { participants, ...updateData } = req.body;
+
+    if (participants) {
+      participants = await Promise.all(
+        participants.map(async (participant) => {
+          const user = await User.findOne({ email: participant.email });
+
+          return {
+            email: participant.email,
+            name: user?.name || participant.email.split("@")[0],
+            userId: user?._id || null,
+            status: participant.status?.toUpperCase() || "PENDING",
+          };
+        })
+      );
+    }
+
+    const updateObj = participants
+      ? { ...updateData, participants }
+      : updateData;
+
+    const updatedEvent = await Event.findByIdAndUpdate(eventId, updateObj, {
+      new: true,
+    });
+
+    if (!updatedEvent) return next(createError(404, "Event not found"));
+
+    res
+      .status(200)
+      .json({ message: "Event updated successfully", event: updatedEvent });
+  } catch (error) {
+    next(createError(500, error.message || "Failed to update event"));
+  }
+};
+
 export const getEvents = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -51,22 +88,6 @@ export const getEvents = async (req, res, next) => {
     res.status(200).json({ events, userId });
   } catch (error) {
     next(createError(500, "Failed to fetch associated events"));
-  }
-};
-
-export const updateEvent = async (req, res, next) => {
-  try {
-    const { eventId } = req.params;
-    const updatedEvent = await Event.findByIdAndUpdate(eventId, req.body, {
-      new: true,
-    });
-    if (!updatedEvent) return next(createError(404, "Event not found"));
-
-    res
-      .status(200)
-      .json({ message: "Event updated successfully", event: updatedEvent });
-  } catch (error) {
-    next(createError(500, error.message || "Failed to update event"));
   }
 };
 
